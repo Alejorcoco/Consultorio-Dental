@@ -426,6 +426,10 @@ class DBService {
           this.save();
       }
   }
+  deletePatient(id: string) {
+      this.patients = this.patients.filter(p => p.id !== id);
+      this.save();
+  }
   searchPatients(query: string) {
       const q = query.toLowerCase();
       return this.patients.filter(p => 

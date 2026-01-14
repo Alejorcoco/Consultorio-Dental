@@ -70,6 +70,7 @@ export interface Patient {
   dni: string; // Carnet de identidad (CI)
   email?: string;
   phone?: string;
+  photo?: string; // New Field: Base64 Image string
   allergies: string; // Stored as comma separated string for simplicity, or we can parse it
   generalDescription: string;
   medicalHistory: string[]; // Antecedentes (Cardio, etc.)

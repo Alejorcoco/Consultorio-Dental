@@ -1,12 +1,11 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../services/db';
 import { Patient, Medication } from '../types';
 import { 
   UserPlus, Save, X, Activity, Ruler, Phone, FileText, Check, 
   AlertCircle, User, Heart, Plus, Trash2, Pill, AlertTriangle, 
-  MapPin, Briefcase, Fingerprint, ChevronDown, ChevronUp, ArrowLeft, Calendar
+  MapPin, Briefcase, Fingerprint, ChevronDown, ChevronUp, ArrowLeft, Calendar, Camera, Upload
 } from 'lucide-react';
 
 interface PatientFormProps {
@@ -37,6 +36,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
   };
 
   const [formData, setFormData] = useState(initialFormData);
+  const [patientPhoto, setPatientPhoto] = useState<string | null>(null); // State for Photo
   const [errors, setErrors] = useState<{[key: string]: boolean | string}>({});
   
   // Lists
@@ -49,6 +49,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
   // UI States
   const [showConfirmSave, setShowConfirmSave] = useState(false);
   const [showConfirmDiscard, setShowConfirmDiscard] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false); // New Delete State
   const [isHistoryOpen, setIsHistoryOpen] = useState(false); // Collapsible state
   const [customHistoryInput, setCustomHistoryInput] = useState('');
   
@@ -57,6 +58,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
 
   // Refs for checking clicks outside if needed, or focused elements
   const formRef = useRef<HTMLDivElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // --- INITIALIZATION ---
   useEffect(() => {
@@ -79,6 +81,10 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
             occupation: patientToEdit.occupation || '',
             medicalHistory: patientToEdit.medicalHistory || []
         });
+        
+        if (patientToEdit.photo) {
+            setPatientPhoto(patientToEdit.photo);
+        }
         
         if (patientToEdit.allergies && patientToEdit.allergies !== 'Ninguna') {
             setAllergyTags(patientToEdit.allergies.split(',').map(s => s.trim()).filter(s => s));
@@ -145,7 +151,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
       if (patientToEdit) return true; // Always confirm when editing existing
       
       const hasBasicData = formData.firstName || formData.lastName || formData.dni || formData.phone || formData.generalDescription;
-      const hasLists = allergyTags.length > 0 || medications.length > 0;
+      const hasLists = allergyTags.length > 0 || medications.length > 0 || patientPhoto !== null;
       
       return hasBasicData || hasLists;
   };
@@ -166,6 +172,49 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
     }
   };
 
+  // --- PHOTO UPLOAD LOGIC ---
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+              const img = new Image();
+              img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  const ctx = canvas.getContext('2d');
+                  
+                  // Resize to square 300x300 for profile
+                  const MAX_SIZE = 300; 
+                  let width = img.width;
+                  let height = img.height;
+
+                  // Center crop logic
+                  const minDim = Math.min(width, height);
+                  const sx = (width - minDim) / 2;
+                  const sy = (height - minDim) / 2;
+
+                  canvas.width = MAX_SIZE;
+                  canvas.height = MAX_SIZE;
+                  
+                  if (ctx) {
+                      ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, MAX_SIZE, MAX_SIZE);
+                      const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                      setPatientPhoto(base64);
+                  }
+              };
+              img.src = event.target?.result as string;
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
+  const handleRemovePhoto = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if(confirm('¿Quitar foto de perfil?')) {
+          setPatientPhoto(null);
+      }
+  };
+
   // --- PHONE VALIDATION LOGIC ---
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       let val = e.target.value.replace(/\D/g, ''); // Remove non-digits
@@ -174,8 +223,6 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
       if (val.length > 0) {
           const firstChar = val.charAt(0);
           if (firstChar !== '6' && firstChar !== '7') {
-              // If user tries to type invalid start, don't update (or strip it)
-              // Here we just ignore the input if it's the first character and incorrect
               return; 
           }
       }
@@ -219,13 +266,8 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
     setFormData({ ...formData, [name]: val.toString() });
   };
 
-  const toggleGender = () => {
-      let nextGender: 'Masculino' | 'Femenino' | 'Otro' | '' = '';
-      if (!formData.gender) nextGender = 'Masculino';
-      else if (formData.gender === 'Masculino') nextGender = 'Femenino';
-      else if (formData.gender === 'Femenino') nextGender = 'Otro';
-      else nextGender = ''; 
-      setFormData(prev => ({ ...prev, gender: nextGender }));
+  const setGender = (g: 'Masculino' | 'Femenino' | 'Otro') => {
+      setFormData(prev => ({ ...prev, gender: g }));
   };
 
   // --- LIST HANDLERS ---
@@ -297,12 +339,9 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
       if (!formData.firstName.trim()) { newErrors.firstName = true; isValid = false; }
       if (!formData.lastName.trim()) { newErrors.lastName = true; isValid = false; }
       
-      // DNI is NOT strictly required anymore, but good to have
-      // if (!formData.dni.trim()) { newErrors.dni = true; isValid = false; }
-      
       if (!formData.generalDescription.trim()) { newErrors.generalDescription = true; isValid = false; }
 
-      // Validate Phone: "Ni más ni menos de 8" IF entered
+      // Validate Phone
       if (formData.phone && formData.phone.length !== 8) {
           newErrors.phone = "El celular debe tener 8 dígitos";
           isValid = false;
@@ -323,6 +362,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
     const finalData: Patient = {
         id: patientToEdit ? patientToEdit.id : '',
         ...formData,
+        photo: patientPhoto || undefined,
         gender: formData.gender === '' ? undefined : formData.gender, // Handle empty string
         civilStatus: formData.civilStatus === '' ? undefined : formData.civilStatus, // Handle empty string
         allergies: allergyTags.length > 0 ? allergyTags.join(', ') : 'Ninguna',
@@ -337,6 +377,14 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
     }
     setShowConfirmSave(false);
     onSuccess();
+  };
+
+  const handleDelete = () => {
+      if (patientToEdit) {
+          db.deletePatient(patientToEdit.id);
+          setShowConfirmDelete(false);
+          onSuccess();
+      }
   };
 
   const medicalConditions = [
@@ -359,7 +407,6 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
   const errorBorder = "border-red-500 ring-1 ring-red-500 focus:border-red-600";
 
   const labelClass = "block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide";
-  // CSS to hide spinners
   const noSpinnerClass = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
   return (
@@ -382,6 +429,15 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
               </div>
            </div>
            <div className="flex gap-3">
+               {patientToEdit && (
+                   <button 
+                        onClick={() => setShowConfirmDelete(true)} 
+                        className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-bold flex items-center gap-2 border border-red-100 dark:bg-red-900/10 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors mr-2"
+                   >
+                       <Trash2 size={18} />
+                       Eliminar Paciente
+                   </button>
+               )}
                <button onClick={handleCancelRequest} className="px-4 py-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 rounded-lg transition-colors text-sm font-medium">Cancelar</button>
                <button 
                  onClick={handleSubmit} 
@@ -406,25 +462,76 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
                             <Fingerprint size={14} /> Identificación
                         </div>
                         
+                        {/* PHOTO UPLOADER */}
                         <div className="flex flex-col items-center mb-6">
-                            <button 
-                                type="button"
-                                onClick={toggleGender}
-                                className={`w-28 h-28 rounded-full flex items-center justify-center text-5xl overflow-hidden border-4 shadow-sm transition-all hover:scale-105 active:scale-95 mb-3 ${
-                                    formData.gender === 'Femenino' ? 'bg-pink-50 border-pink-100 text-pink-500' :
-                                    formData.gender === 'Masculino' ? 'bg-blue-50 border-blue-100 text-blue-500' :
-                                    'bg-slate-100 border-slate-50 dark:bg-slate-700 dark:border-slate-600 text-slate-300'
-                                }`}
-                            >
-                                {formData.firstName && !formData.gender ? (
-                                    <span className="font-bold uppercase">{formData.firstName.charAt(0)}</span>
-                                ) : (
-                                    <User size={48} strokeWidth={1.5} />
+                            <div className="relative group">
+                                <button 
+                                    type="button"
+                                    onClick={() => photoInputRef.current?.click()}
+                                    className={`w-32 h-32 rounded-full flex items-center justify-center text-5xl overflow-hidden border-4 shadow-md transition-all hover:scale-105 active:scale-95 bg-slate-100 border-slate-50 dark:bg-slate-700 dark:border-slate-600 group-hover:border-indigo-200 relative`}
+                                >
+                                    {patientPhoto ? (
+                                        <img src={patientPhoto} alt="Profile" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="text-slate-300 dark:text-slate-500">
+                                            {formData.firstName ? (
+                                                <span className="font-bold uppercase">{formData.firstName.charAt(0)}</span>
+                                            ) : (
+                                                <User size={48} strokeWidth={1.5} />
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Overlay Hover Effect */}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors rounded-full">
+                                        <Camera size={24} className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md" />
+                                    </div>
+                                </button>
+                                
+                                {patientPhoto && (
+                                    <button 
+                                        type="button"
+                                        onClick={handleRemovePhoto}
+                                        className="absolute top-0 right-0 bg-white dark:bg-slate-600 text-red-500 rounded-full p-1.5 shadow-md border border-slate-100 dark:border-slate-500 hover:bg-red-50 transition-colors"
+                                        title="Eliminar foto"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
                                 )}
-                            </button>
-                            <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
-                                {formData.gender || 'Clic para género'}
-                            </span>
+                            </div>
+                            
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                ref={photoInputRef}
+                                onChange={handlePhotoUpload}
+                            />
+                            
+                            {/* GENDER SELECTOR - Redesigned to sit below photo */}
+                            <div className="flex items-center gap-2 mt-4 bg-slate-50 dark:bg-slate-700/50 p-1 rounded-lg border border-slate-100 dark:border-slate-600">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setGender('Masculino')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${formData.gender === 'Masculino' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}
+                                >
+                                    Masculino
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setGender('Femenino')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${formData.gender === 'Femenino' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300 shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}
+                                >
+                                    Femenino
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setGender('Otro')}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${formData.gender === 'Otro' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}
+                                >
+                                    Otro
+                                </button>
+                            </div>
                         </div>
 
                         <div className="space-y-4">
@@ -477,7 +584,6 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
                                     {errors.phone && <span className="text-[10px] text-red-500 font-medium block leading-tight mt-1">{errors.phone}</span>}
                                 </div>
                             </div>
-                            {/* UPDATED: Birth Date is now here, taking full width */}
                             <div>
                                 <label className={labelClass}>Fecha de Nacimiento</label>
                                 <input 
@@ -548,8 +654,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
 
                 {/* COL 2: CLINICAL DATA (7 Columns) */}
                 <div className="lg:col-span-7 space-y-6">
-                    
-                    {/* C. Motive */}
+                    {/* ... (Clinical data sections remain unchanged, just rendered) ... */}
                     <div className="bg-amber-50 dark:bg-amber-900/10 rounded-2xl p-6 shadow-sm border border-amber-100 dark:border-amber-800">
                         <div className="flex items-center gap-2 mb-3 text-amber-700 dark:text-amber-500 uppercase text-xs font-bold tracking-widest">
                             <FileText size={14} /> Motivo de Consulta <span className="text-red-500">*</span>
@@ -578,7 +683,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
                         {errors.generalDescription && <p className="text-[10px] text-red-500 font-medium mt-1">Este campo es obligatorio</p>}
                     </div>
 
-                    {/* D. Medical History (Collapsible) */}
+                    {/* Medical History */}
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                         <button 
                             type="button"
@@ -615,7 +720,6 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
                                     })}
                                 </div>
                                 
-                                {/* Custom History Input */}
                                 <div className="flex gap-2">
                                     <input 
                                         value={customHistoryInput}
@@ -632,7 +736,6 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
                                         <Plus size={16} />
                                     </button>
                                 </div>
-                                {/* Display custom tags if they are not in predefined list */}
                                 <div className="flex flex-wrap gap-2 mt-2">
                                     {formData.medicalHistory.filter(h => !medicalConditions.some(mc => mc.id === h)).map(h => (
                                         <span key={h} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-100">
@@ -644,7 +747,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
                         )}
                     </div>
 
-                    {/* E. Allergies & Meds */}
+                    {/* Allergies & Meds */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Allergies */}
                         <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col">
@@ -671,7 +774,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
                             </div>
                         </div>
 
-                        {/* Medications (Unified UI) */}
+                        {/* Medications */}
                         <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col">
                             <div className="flex items-center gap-2 mb-3 text-emerald-500 uppercase text-xs font-bold tracking-widest">
                                 <Pill size={14} /> Medicación Actual
@@ -702,7 +805,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
             </div>
         </div>
 
-        {/* SAVE CONFIRMATION OVERLAY */}
+        {/* SAVE CONFIRMATION */}
         {showConfirmSave && (
         <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 text-center max-w-sm w-full mx-4 border border-slate-100 dark:border-slate-700 animate-slide-up">
@@ -720,7 +823,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
         </div>
       )}
 
-      {/* DISCARD CONFIRMATION OVERLAY */}
+      {/* DISCARD CONFIRMATION */}
       {showConfirmDiscard && (
         <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 text-center max-w-sm w-full mx-4 border border-slate-100 dark:border-slate-700 animate-slide-up">
@@ -732,6 +835,25 @@ export const PatientForm: React.FC<PatientFormProps> = ({ onCancel, onSuccess, p
               <div className="flex gap-3 mt-5">
                  <button onClick={() => setShowConfirmDiscard(false)} className="flex-1 py-2 border border-slate-200 rounded-lg text-slate-600 text-sm font-medium hover:bg-slate-50">Seguir Editando</button>
                  <button onClick={onCancel} className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-bold shadow hover:bg-red-700">Sí, Salir</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION */}
+      {showConfirmDelete && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
+           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 text-center max-w-sm w-full mx-4 border border-slate-100 dark:border-slate-700 animate-slide-up">
+              <div className="w-14 h-14 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-3 text-red-600 dark:text-red-400">
+                 <AlertTriangle size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">¿Eliminar Paciente?</h3>
+              <p className="text-sm text-red-500 dark:text-red-400 mb-2 font-bold">
+                  ADVERTENCIA: Esta acción no se puede deshacer.
+              </p>
+              <div className="flex gap-3 mt-5">
+                 <button onClick={() => setShowConfirmDelete(false)} className="flex-1 py-2 border border-slate-200 rounded-lg text-slate-600 text-sm font-medium hover:bg-slate-50">Cancelar</button>
+                 <button onClick={handleDelete} className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-bold shadow hover:bg-red-700">Sí, Eliminar</button>
               </div>
            </div>
         </div>

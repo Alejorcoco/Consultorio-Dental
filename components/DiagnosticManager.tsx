@@ -475,8 +475,8 @@ const DiagnosticManager: React.FC<DiagnosticManagerProps> = ({ initialPatient, u
                                             className="w-full text-left px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700 last:border-0 flex justify-between items-center group transition-colors"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 font-bold">
-                                                    {p.firstName.charAt(0)}{p.lastName.charAt(0)}
+                                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 font-bold overflow-hidden">
+                                                    {p.photo ? <img src={p.photo} className="w-full h-full object-cover" /> : <>{p.firstName.charAt(0)}{p.lastName.charAt(0)}</>}
                                                 </div>
                                                 <div>
                                                     <span className="font-bold text-slate-800 dark:text-white block text-base">{p.firstName} {p.lastName}</span>
@@ -552,8 +552,8 @@ const DiagnosticManager: React.FC<DiagnosticManagerProps> = ({ initialPatient, u
                                     className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex justify-between items-center group transition-colors cursor-pointer"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold group-hover:scale-110 transition-transform">
-                                            {item.patient.firstName.charAt(0)}{item.patient.lastName.charAt(0)}
+                                        <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold group-hover:scale-110 transition-transform overflow-hidden">
+                                            {item.patient.photo ? <img src={item.patient.photo} className="w-full h-full object-cover" /> : <>{item.patient.firstName.charAt(0)}{item.patient.lastName.charAt(0)}</>}
                                         </div>
                                         <div>
                                             <p className="font-bold text-slate-800 dark:text-white group-hover:text-primary transition-colors">{item.patient.firstName} {item.patient.lastName}</p>
@@ -642,8 +642,8 @@ const DiagnosticManager: React.FC<DiagnosticManagerProps> = ({ initialPatient, u
             {/* TOP BAR */}
             <div className="bg-white dark:bg-slate-800 shadow-lg border-t-4 border-t-teal-500 rounded-b-2xl mx-4 mt-2 p-4 md:px-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between z-30 relative mb-4">
                 <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg ring-4 ring-white dark:ring-slate-800">
-                        {patient.firstName.charAt(0)}
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg ring-4 ring-white dark:ring-slate-800 overflow-hidden">
+                        {patient.photo ? <img src={patient.photo} className="w-full h-full object-cover" /> : <>{patient.firstName.charAt(0)}</>}
                     </div>
                     <div>
                         <h2 className="text-2xl font-bold text-slate-800 dark:text-white leading-tight">{patient.firstName} {patient.lastName}</h2>

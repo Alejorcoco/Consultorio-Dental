@@ -357,8 +357,8 @@ const ClinicalHistoryModal: React.FC<ClinicalHistoryModalProps> = ({ patient, on
             {/* Patient Header Summary */}
             <div className="bg-white dark:bg-slate-800 p-6 border-b border-slate-200 dark:border-slate-700 flex flex-col md:flex-row gap-6 items-start">
                 <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-2xl font-bold text-slate-500 dark:text-slate-300">
-                        {patient.firstName.charAt(0)}{patient.lastName.charAt(0)}
+                    <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-2xl font-bold text-slate-500 dark:text-slate-300 overflow-hidden">
+                        {patient.photo ? <img src={patient.photo} className="w-full h-full object-cover" /> : <>{patient.firstName.charAt(0)}{patient.lastName.charAt(0)}</>}
                     </div>
                     <div>
                         <h3 className="text-xl font-bold text-slate-800 dark:text-white">{patient.firstName} {patient.lastName}</h3>
